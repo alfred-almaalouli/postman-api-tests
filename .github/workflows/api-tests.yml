@@ -1,0 +1,44 @@
+name: API Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1-5"   # every weekday at 06:00 UTC, like an API monitor
+
+jobs:
+  newman:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Run API tests
+        run: |
+          newman run collection/restful-booker.postman_collection.json \
+            -e collection/restful-booker.postman_environment.json \
+            --folder "01 Health" --folder "02 Authentication" \
+            --folder "03 Booking CRUD" --folder "04 Negative tests" \
+            -r cli,htmlextra --reporter-htmlextra-export reports/api-tests.html
+
+      - name: Run data-driven tests
+        run: |
+          newman run collection/restful-booker.postman_collection.json \
+            -e collection/restful-booker.postman_environment.json \
+            --folder "05 Data-driven" -d data/guests.csv \
+            -r cli,htmlextra --reporter-htmlextra-export reports/data-driven.html
+
+      - name: Upload HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-reports
+          path: reports/
